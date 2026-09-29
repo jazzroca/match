@@ -1,0 +1,876 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>막대기 게임 - 2인용</title>
+<style>
+  :root {
+    --bg1:#0f172a;
+    --bg2:#111827;
+    --panel:#1f2937;
+    --panel2:#0b1220;
+    --p1:#3b82f6;
+    --p2:#ef4444;
+    --gold:#fbbf24;
+    --text:#f8fafc;
+    --muted:#94a3b8;
+    --green:#22c55e;
+  }
+
+  * {
+    box-sizing: border-box;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  html, body {
+    margin:0;
+    min-height:100%;
+    overscroll-behavior:none;
+    background:
+      radial-gradient(circle at top, #1e293b 0%, var(--bg1) 45%, #020617 100%);
+    color:var(--text);
+    font-family:system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    user-select:none;
+    touch-action:manipulation;
+  }
+
+  body {
+    min-height:100vh;
+    display:flex;
+    justify-content:center;
+    align-items:center;
+    padding:18px;
+  }
+
+  .game {
+    width:min(760px, 100%);
+    background:rgba(15,23,42,.92);
+    border:1px solid rgba(255,255,255,.08);
+    box-shadow:0 24px 60px rgba(0,0,0,.45);
+    border-radius:28px;
+    padding:24px;
+    position:relative;
+    overflow:hidden;
+  }
+
+  h1 {
+    text-align:center;
+    margin:0 0 8px;
+    font-size:clamp(28px, 5vw, 42px);
+    letter-spacing:-1px;
+  }
+
+  .subtitle {
+    text-align:center;
+    color:var(--muted);
+    font-size:14px;
+    line-height:1.6;
+    margin-bottom:18px;
+  }
+
+  .scoreboard {
+    display:grid;
+    grid-template-columns:1fr auto 1fr;
+    gap:12px;
+    align-items:center;
+    margin-bottom:16px;
+  }
+
+  .score {
+    border-radius:18px;
+    padding:14px;
+    text-align:center;
+    background:#111827;
+    border:2px solid transparent;
+    transition:.2s;
+  }
+
+  .score.p1.active {
+    border-color:var(--p1);
+    box-shadow:0 0 22px rgba(59,130,246,.3);
+  }
+
+  .score.p2.active {
+    border-color:var(--p2);
+    box-shadow:0 0 22px rgba(239,68,68,.3);
+  }
+
+  .score .name {
+    font-weight:800;
+    font-size:15px;
+  }
+
+  .score .wins {
+    font-size:30px;
+    line-height:1.1;
+    font-weight:900;
+    margin-top:4px;
+  }
+
+  .score.p1 .wins { color:#60a5fa; }
+  .score.p2 .wins { color:#f87171; }
+
+  .versus {
+    font-size:18px;
+    font-weight:900;
+    color:#64748b;
+  }
+
+  .turn {
+    margin:0 auto 16px;
+    width:max-content;
+    max-width:100%;
+    border-radius:999px;
+    padding:10px 20px;
+    font-size:18px;
+    font-weight:900;
+    transition:.25s;
+  }
+
+  .turn.p1 { background:var(--p1); }
+  .turn.p2 { background:var(--p2); }
+
+  .board {
+    background:linear-gradient(180deg, rgba(2,6,23,.86), rgba(15,23,42,.88));
+    border:1px solid rgba(255,255,255,.06);
+    border-radius:24px;
+    padding:16px 10px;
+  }
+
+  .row {
+    min-height:110px;
+    display:flex;
+    justify-content:center;
+    align-items:center;
+    gap:clamp(16px, 4vw, 30px);
+    border-radius:18px;
+    position:relative;
+    transition:.2s;
+  }
+
+  .row + .row {
+    border-top:1px solid rgba(255,255,255,.04);
+  }
+
+  .row.selected {
+    background:rgba(255,255,255,.045);
+    box-shadow:inset 0 0 0 1px rgba(255,255,255,.06);
+  }
+
+  .row.locked {
+    opacity:.22;
+    filter:grayscale(.5);
+    pointer-events:none;
+  }
+
+  .stick {
+    position:relative;
+    width:24px;
+    height:78px;
+    border-radius:9px 9px 6px 6px;
+    background:
+      linear-gradient(90deg, #a16207 0%, #facc15 24%, #fde68a 52%, #eab308 74%, #854d0e 100%);
+    box-shadow:
+      inset 2px 0 2px rgba(255,255,255,.45),
+      inset -2px 0 2px rgba(0,0,0,.22),
+      0 8px 12px rgba(0,0,0,.35);
+    transform-origin:center bottom;
+    transition:transform .18s ease, opacity .22s ease, filter .18s ease;
+    cursor:pointer;
+    flex:0 0 auto;
+    touch-action:manipulation;
+  }
+
+  .stick::before {
+    content:"";
+    position:absolute;
+    left:50%;
+    top:-13px;
+    transform:translateX(-50%);
+    width:29px;
+    height:24px;
+    border-radius:50% 50% 45% 45%;
+    background:
+      radial-gradient(circle at 38% 32%, #fb923c 0 18%, #dc2626 45%, #7f1d1d 74%);
+    box-shadow:0 2px 4px rgba(0,0,0,.35);
+  }
+
+  .stick:hover {
+    filter:brightness(1.1);
+    transform:translateY(-2px) scale(1.05);
+  }
+
+  .stick.removed {
+    opacity:0;
+    transform:translateY(18px) rotate(15deg) scale(.1);
+    pointer-events:none;
+  }
+
+  .message {
+    min-height:28px;
+    text-align:center;
+    color:#fde68a;
+    font-weight:800;
+    margin:14px 0 10px;
+  }
+
+  .controls {
+    display:flex;
+    gap:10px;
+    justify-content:center;
+    flex-wrap:wrap;
+  }
+
+  button {
+    border:0;
+    color:white;
+    border-radius:14px;
+    padding:13px 18px;
+    font-size:16px;
+    font-weight:900;
+    cursor:pointer;
+    box-shadow:0 8px 18px rgba(0,0,0,.22);
+    transition:.14s;
+  }
+
+  button:active { transform:scale(.96); }
+
+  .player-end { background:var(--green); }
+  .p1-end { background:var(--p1); }
+  .p2-end { background:var(--p2); }
+  .player-end.current {
+    outline:3px solid rgba(255,255,255,.22);
+    box-shadow:0 0 22px rgba(255,255,255,.14);
+  }
+  #resetGame { background:#f97316; }
+  #resetScore { background:#475569; }
+
+  button:disabled {
+    opacity:.42;
+    cursor:not-allowed;
+    filter:grayscale(.7);
+  }
+
+  .hint {
+    text-align:center;
+    color:#64748b;
+    margin-top:12px;
+    font-size:12px;
+  }
+
+  .overlay {
+    position:fixed;
+    inset:0;
+    display:none;
+    align-items:center;
+    justify-content:center;
+    background:rgba(2,6,23,.86);
+    z-index:20;
+    padding:20px;
+  }
+
+  .overlay.show { display:flex; }
+
+  .win-card {
+    width:min(520px, 95vw);
+    text-align:center;
+    padding:32px 22px;
+    border-radius:28px;
+    background:rgba(15,23,42,.95);
+    border:1px solid rgba(255,255,255,.1);
+    box-shadow:0 30px 80px rgba(0,0,0,.52);
+    animation:pop .42s cubic-bezier(.2,.8,.2,1);
+    position:relative;
+    z-index:22;
+  }
+
+  .win-title {
+    font-size:clamp(64px, 18vw, 110px);
+    line-height:.9;
+    font-weight:1000;
+    color:var(--gold);
+    text-shadow:
+      0 0 10px rgba(251,191,36,.6),
+      0 0 28px rgba(251,191,36,.28);
+  }
+
+  .winner {
+    font-size:26px;
+    font-weight:900;
+    margin:18px 0 6px;
+  }
+
+  .result-note {
+    color:var(--muted);
+    margin-bottom:22px;
+  }
+
+  #playAgain { background:var(--p1); }
+
+  #fx {
+    position:fixed;
+    inset:0;
+    width:100%;
+    height:100%;
+    z-index:21;
+    pointer-events:none;
+  }
+
+  @keyframes pop {
+    0% { transform:scale(.75); opacity:0; }
+    70% { transform:scale(1.06); }
+    100% { transform:scale(1); opacity:1; }
+  }
+
+  @media (max-width:520px) {
+    .game { padding:16px 12px; border-radius:22px; }
+    .row { min-height:92px; gap:17px; }
+    .stick { width:20px; height:64px; }
+    .stick::before { width:25px; height:20px; top:-11px; }
+    .score .wins { font-size:26px; }
+    button { flex:1 1 40%; }
+  }
+</style>
+</head>
+
+<body>
+<div class="game">
+  <h1>🔥 막대기 게임</h1>
+  <div class="subtitle">
+    성냥개비는 <b>같은 성냥개비를 두 번 터치해야 1개가 제거</b>됩니다.<br>
+    한 턴에는 <b>한 줄에서만</b> 제거할 수 있고, 선택한 줄에서는 1개부터 전부까지 제거할 수 있습니다.<br>
+    제거를 마치면 현재 플레이어의 <b>끝 버튼</b>을 눌러 다음 플레이어에게 차례를 넘깁니다.<br>
+    전체 막대기가 <b>1개 남는 순간 현재 플레이어가 승리</b>합니다.
+  </div>
+
+  <div class="scoreboard">
+    <div id="scoreP1" class="score p1 active">
+      <div class="name">PLAYER 1</div>
+      <div id="winsP1" class="wins">0</div>
+      <div>WINS</div>
+    </div>
+
+    <div class="versus">VS</div>
+
+    <div id="scoreP2" class="score p2">
+      <div class="name">PLAYER 2</div>
+      <div id="winsP2" class="wins">0</div>
+      <div>WINS</div>
+    </div>
+  </div>
+
+  <div id="turn" class="turn p1">PLAYER 1 TURN</div>
+
+  <div class="board" id="board">
+    <div class="row" data-row="0">
+      <div class="stick"></div><div class="stick"></div><div class="stick"></div>
+    </div>
+
+    <div class="row" data-row="1">
+      <div class="stick"></div><div class="stick"></div><div class="stick"></div><div class="stick"></div>
+    </div>
+
+    <div class="row" data-row="2">
+      <div class="stick"></div><div class="stick"></div><div class="stick"></div><div class="stick"></div><div class="stick"></div>
+    </div>
+  </div>
+
+  <div id="message" class="message">성냥개비를 빠르게 두 번 터치하세요.</div>
+
+  <div class="controls">
+    <button id="endTurnP1" class="player-end p1-end" disabled>PLAYER 1 끝</button>
+    <button id="endTurnP2" class="player-end p2-end" disabled>PLAYER 2 끝</button>
+    <button id="resetGame">게임 리셋</button>
+    <button id="resetScore">점수 초기화</button>
+  </div>
+
+  <div class="hint">
+    성냥개비마다 더블 터치/더블 클릭 · 한 턴에는 같은 줄만 제거
+  </div>
+</div>
+
+<div id="winOverlay" class="overlay">
+  <canvas id="fx"></canvas>
+
+  <div class="win-card">
+    <div class="win-title">WIN!</div>
+    <div id="winner" class="winner">PLAYER 1 WIN</div>
+    <div id="resultNote" class="result-note"></div>
+    <button id="playAgain">다시 시작</button>
+  </div>
+</div>
+
+<script>
+(() => {
+  const rows = [...document.querySelectorAll(".row")];
+  const allSticks = [...document.querySelectorAll(".stick")];
+
+  const turnEl = document.getElementById("turn");
+  const messageEl = document.getElementById("message");
+
+  const scoreP1 = document.getElementById("scoreP1");
+  const scoreP2 = document.getElementById("scoreP2");
+
+  const winsP1El = document.getElementById("winsP1");
+  const winsP2El = document.getElementById("winsP2");
+
+  const endTurnP1Btn = document.getElementById("endTurnP1");
+  const endTurnP2Btn = document.getElementById("endTurnP2");
+  const resetGameBtn = document.getElementById("resetGame");
+  const resetScoreBtn = document.getElementById("resetScore");
+
+  const winOverlay = document.getElementById("winOverlay");
+  const winnerEl = document.getElementById("winner");
+  const resultNoteEl = document.getElementById("resultNote");
+  const playAgainBtn = document.getElementById("playAgain");
+
+  let currentPlayer = 1;
+  let selectedRow = null;
+  let removedThisTurn = false;
+  let gameOver = false;
+
+
+  // 승리 횟수는 게임 리셋 후에도 유지됩니다.
+  let wins = {
+    1: Number(localStorage.getItem("stickGameWinsP1") || 0),
+    2: Number(localStorage.getItem("stickGameWinsP2") || 0)
+  };
+
+  updateScore();
+  updateTurn();
+  updateEndButtons();
+
+  // -------------------------------
+  // 효과음: 외부 mp3 없이 Web Audio 사용
+  // -------------------------------
+  let audioCtx = null;
+
+  function getAudioContext() {
+    if (!audioCtx) {
+      const AudioContext = window.AudioContext || window.webkitAudioContext;
+      if (AudioContext) audioCtx = new AudioContext();
+    }
+    return audioCtx;
+  }
+
+  function beep(freq = 520, duration = 0.05, type = "sine", volume = 0.035) {
+    const ctx = getAudioContext();
+    if (!ctx) return;
+
+    if (ctx.state === "suspended") ctx.resume();
+
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+
+    osc.type = type;
+    osc.frequency.value = freq;
+
+    gain.gain.setValueAtTime(volume, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration);
+
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+
+    osc.start();
+    osc.stop(ctx.currentTime + duration);
+  }
+
+  function playRemoveSound() {
+    beep(420, 0.055, "triangle", 0.04);
+  }
+
+  function playTurnSound() {
+    beep(650, 0.08, "sine", 0.035);
+  }
+
+  function playWinSound() {
+    [523, 659, 784, 1046].forEach((f, i) => {
+      setTimeout(() => beep(f, 0.18, "triangle", 0.06), i * 110);
+    });
+  }
+
+  function playLoseSound() {
+    [400, 320, 240].forEach((f, i) => {
+      setTimeout(() => beep(f, 0.16, "sawtooth", 0.035), i * 120);
+    });
+  }
+
+  // -------------------------------
+  // 막대기 제거
+  // -------------------------------
+  function removeStick(stick) {
+    if (gameOver || !stick || stick.classList.contains("removed")) return;
+
+    const row = stick.closest(".row");
+    if (!row) return;
+
+    const rowNumber = Number(row.dataset.row);
+
+    // 이미 다른 줄을 선택했다면 제거 불가
+    if (selectedRow !== null && selectedRow !== rowNumber) {
+      messageEl.textContent = "⚠️ 한 턴에는 한 줄만 선택할 수 있습니다.";
+      beep(170, 0.08, "square", 0.025);
+      return;
+    }
+
+    // 첫 제거 시 현재 줄 고정
+    if (selectedRow === null) {
+      selectedRow = rowNumber;
+      lockOtherRows(rowNumber);
+    }
+
+    stick.classList.add("removed");
+    removedThisTurn = true;
+    updateEndButtons();
+
+    playRemoveSound();
+
+    const remaining = getRemainingCount();
+
+    if (remaining === 1) {
+      finishGame(currentPlayer, `${currentPlayer === 1 ? "PLAYER 1" : "PLAYER 2"}가 마지막 1개를 상대에게 남겼습니다.`);
+      return;
+    }
+
+    if (remaining === 0) {
+      const winner = currentPlayer === 1 ? 2 : 1;
+      finishGame(winner, `마지막 막대기를 없앤 PLAYER ${currentPlayer}의 패배입니다.`);
+      return;
+    }
+
+    messageEl.textContent = `같은 줄의 다른 성냥도 각각 더블 터치해 제거할 수 있습니다. 끝나면 PLAYER ${currentPlayer} 끝을 누르세요. (남은 ${remaining}개)`;
+  }
+
+  function getRemainingCount() {
+    return document.querySelectorAll(".stick:not(.removed)").length;
+  }
+
+  function lockOtherRows(rowNumber) {
+    rows.forEach(row => {
+      const n = Number(row.dataset.row);
+      if (n === rowNumber) {
+        row.classList.add("selected");
+      } else {
+        row.classList.add("locked");
+      }
+    });
+  }
+
+  function unlockRows() {
+    rows.forEach(row => row.classList.remove("selected", "locked"));
+  }
+
+  // -------------------------------
+  // 더블 터치 / 더블 클릭으로 제거
+  // -------------------------------
+  const DOUBLE_TAP_DELAY = 450;
+  let lastTouchTime = 0;
+  let lastTouchStick = null;
+
+  allSticks.forEach(stick => {
+
+    // 스마트폰 / 태블릿: touchend 기반 더블 터치
+    stick.addEventListener("touchend", (e) => {
+      if (gameOver || stick.classList.contains("removed")) return;
+
+      const now = Date.now();
+
+      const isDoubleTap =
+        lastTouchStick === stick &&
+        (now - lastTouchTime) <= DOUBLE_TAP_DELAY;
+
+      if (isDoubleTap) {
+        e.preventDefault();
+        e.stopPropagation();
+
+        removeStick(stick);
+
+        lastTouchTime = 0;
+        lastTouchStick = null;
+      } else {
+        e.preventDefault();
+        e.stopPropagation();
+
+        lastTouchTime = now;
+        lastTouchStick = stick;
+
+        messageEl.textContent = "한 번 더 빠르게 같은 성냥개비를 터치하세요.";
+        beep(260, 0.035, "sine", 0.018);
+      }
+    }, { passive:false });
+
+
+    // PC: 더블 클릭
+    stick.addEventListener("dblclick", (e) => {
+      if (gameOver || stick.classList.contains("removed")) return;
+
+      e.preventDefault();
+      e.stopPropagation();
+
+      removeStick(stick);
+
+      lastTouchTime = 0;
+      lastTouchStick = null;
+    });
+
+
+    // PC에서 첫 클릭 시 안내만 표시
+    stick.addEventListener("click", (e) => {
+      // 터치에서 발생한 synthetic click은 무시
+      if (e.detail === 0) return;
+      if (gameOver || stick.classList.contains("removed")) return;
+
+      if (e.detail === 1) {
+        messageEl.textContent = "한 번 더 더블 클릭하면 제거됩니다.";
+      }
+    });
+
+  });
+
+  // 브라우저 기본 더블탭 확대 방지
+  document.addEventListener("gesturestart", (e) => {
+    e.preventDefault();
+  }, { passive:false });
+
+  document.addEventListener("dblclick", (e) => {
+    e.preventDefault();
+  }, { passive:false });
+
+  // -------------------------------
+  // 플레이어별 턴 종료
+  // -------------------------------
+  function endCurrentTurn(playerWhoPressed) {
+    if (gameOver) return;
+
+    // 자기 차례의 버튼만 사용할 수 있음
+    if (playerWhoPressed !== currentPlayer) {
+      messageEl.textContent = `지금은 PLAYER ${currentPlayer} 차례입니다.`;
+      beep(170, 0.08, "square", 0.025);
+      return;
+    }
+
+    // 최소 1개는 제거해야 턴 종료 가능
+    if (!removedThisTurn) {
+      messageEl.textContent = "성냥개비를 최소 1개 제거한 뒤 끝 버튼을 누르세요.";
+      beep(170, 0.08, "square", 0.025);
+      return;
+    }
+
+    currentPlayer = currentPlayer === 1 ? 2 : 1;
+    selectedRow = null;
+    removedThisTurn = false;
+
+    unlockRows();
+    updateTurn();
+    updateEndButtons();
+
+    messageEl.textContent = `PLAYER ${currentPlayer} 차례입니다. 같은 줄에서 원하는 만큼 제거하세요.`;
+    playTurnSound();
+  }
+
+  endTurnP1Btn.addEventListener("click", () => endCurrentTurn(1));
+  endTurnP2Btn.addEventListener("click", () => endCurrentTurn(2));
+
+  function updateTurn() {
+    turnEl.classList.remove("p1", "p2");
+    scoreP1.classList.remove("active");
+    scoreP2.classList.remove("active");
+
+    if (currentPlayer === 1) {
+      turnEl.textContent = "PLAYER 1 TURN";
+      turnEl.classList.add("p1");
+      scoreP1.classList.add("active");
+    } else {
+      turnEl.textContent = "PLAYER 2 TURN";
+      turnEl.classList.add("p2");
+      scoreP2.classList.add("active");
+    }  }
+
+  function updateEndButtons() {
+    // 현재 플레이어의 버튼만 활성 후보이며,
+    // 실제 클릭 가능 여부는 그 턴에 1개 이상 제거했는지로 결정
+    const p1Turn = currentPlayer === 1;
+    const p2Turn = currentPlayer === 2;
+
+    endTurnP1Btn.classList.toggle("current", p1Turn);
+    endTurnP2Btn.classList.toggle("current", p2Turn);
+
+    endTurnP1Btn.disabled = !(p1Turn && removedThisTurn && !gameOver);
+    endTurnP2Btn.disabled = !(p2Turn && removedThisTurn && !gameOver);
+  }
+
+  // -------------------------------
+  // 승리 / 누적 점수
+  // -------------------------------
+  function finishGame(winner, note) {
+    if (gameOver) return;
+
+    gameOver = true;
+    lastTouchTime = 0;
+    lastTouchStick = null;
+
+    wins[winner]++;
+    localStorage.setItem("stickGameWinsP1", wins[1]);
+    localStorage.setItem("stickGameWinsP2", wins[2]);
+    updateScore();
+
+    updateEndButtons();
+
+    winnerEl.textContent = `PLAYER ${winner} WIN!`;
+    resultNoteEl.textContent = note;
+
+    playWinSound();
+    setTimeout(() => {
+      winOverlay.classList.add("show");
+      startFireworks();
+    }, 220);
+  }
+
+  function updateScore() {
+    winsP1El.textContent = wins[1];
+    winsP2El.textContent = wins[2];
+  }
+
+  // -------------------------------
+  // 게임 리셋
+  // -------------------------------
+  function resetGame() {
+    currentPlayer = 1;
+    selectedRow = null;
+    removedThisTurn = false;
+    gameOver = false;
+    lastTouchTime = 0;
+    lastTouchStick = null;
+
+    allSticks.forEach(stick => stick.classList.remove("removed"));
+
+    unlockRows();
+    updateEndButtons();
+    winOverlay.classList.remove("show");
+    stopFireworks();
+
+    messageEl.textContent = "성냥개비를 빠르게 두 번 터치하세요.";
+    updateTurn();
+  }
+
+  resetGameBtn.addEventListener("click", resetGame);
+  playAgainBtn.addEventListener("click", resetGame);
+
+  resetScoreBtn.addEventListener("click", () => {
+    wins = {1:0, 2:0};
+    localStorage.setItem("stickGameWinsP1", 0);
+    localStorage.setItem("stickGameWinsP2", 0);
+    updateScore();
+    beep(300, 0.09, "sine", 0.03);
+    messageEl.textContent = "승리 횟수를 0 : 0으로 초기화했습니다.";
+  });
+
+  // -------------------------------
+  // 폭죽 애니메이션
+  // -------------------------------
+  const canvas = document.getElementById("fx");
+  const ctx = canvas.getContext("2d");
+
+  let particles = [];
+  let fireworkFrame = null;
+  let fireworkRunning = false;
+  let fireworkTimer = null;
+
+  function resizeCanvas() {
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    canvas.width = innerWidth * dpr;
+    canvas.height = innerHeight * dpr;
+    canvas.style.width = innerWidth + "px";
+    canvas.style.height = innerHeight + "px";
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+
+  window.addEventListener("resize", resizeCanvas);
+  resizeCanvas();
+
+  function randomColor() {
+    const colors = ["#fbbf24","#60a5fa","#f87171","#34d399","#c084fc","#fb7185","#ffffff"];
+    return colors[Math.floor(Math.random() * colors.length)];
+  }
+
+  function burst(x, y) {
+    const count = 56;
+
+    for (let i = 0; i < count; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const speed = 1.8 + Math.random() * 5.2;
+
+      particles.push({
+        x,
+        y,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed,
+        life: 60 + Math.random() * 32,
+        maxLife: 92,
+        size: 1.5 + Math.random() * 3,
+        color: randomColor()
+      });
+    }
+  }
+
+  function animateFireworks() {
+    if (!fireworkRunning) return;
+
+    ctx.clearRect(0, 0, innerWidth, innerHeight);
+
+    particles.forEach(p => {
+      p.x += p.vx;
+      p.y += p.vy;
+      p.vy += 0.045;
+      p.vx *= 0.994;
+      p.life--;
+
+      const alpha = Math.max(0, p.life / p.maxLife);
+
+      ctx.globalAlpha = alpha;
+      ctx.fillStyle = p.color;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+      ctx.fill();
+    });
+
+    ctx.globalAlpha = 1;
+    particles = particles.filter(p => p.life > 0);
+
+    fireworkFrame = requestAnimationFrame(animateFireworks);
+  }
+
+  function startFireworks() {
+    stopFireworks();
+
+    fireworkRunning = true;
+    particles = [];
+
+    burst(innerWidth * 0.25, innerHeight * 0.32);
+    burst(innerWidth * 0.75, innerHeight * 0.28);
+    burst(innerWidth * 0.5, innerHeight * 0.18);
+
+    animateFireworks();
+
+    fireworkTimer = setInterval(() => {
+      burst(
+        innerWidth * (0.15 + Math.random() * 0.7),
+        innerHeight * (0.12 + Math.random() * 0.38)
+      );
+    }, 650);
+  }
+
+  function stopFireworks() {
+    fireworkRunning = false;
+    if (fireworkFrame) cancelAnimationFrame(fireworkFrame);
+    if (fireworkTimer) clearInterval(fireworkTimer);
+    fireworkFrame = null;
+    fireworkTimer = null;
+    particles = [];
+    ctx.clearRect(0, 0, innerWidth, innerHeight);
+  }
+})();
+</script>
+</body>
+</html>
